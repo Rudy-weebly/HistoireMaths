@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Triangle de Sierpiński</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+
+      :root {
+        --bg:      #0a0a0f;
+        --surface: #111118;
+        --border:  #1e1e2e;
+        --accent:  #00ffcc;
+        --accent2: #ff6b6b;
+        --accent3: #ffd166;
+        --text:    #e8e8f0;
+        --muted:   #555570;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      /* Toutes les tailles sont en rem : l'interface s'adapte à la taille de la fenêtre */
+      html {
+        font-size: clamp(13.5px, calc(0.5vw + 1vh), 19px);
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'Syne', sans-serif;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        overflow-x: hidden;
+      }
+
+      /* Grid background */
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(0, 255, 204, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(0, 255, 204, 0.03) 1px, transparent 1px);
+        background-size: 40px 40px;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      /* ── Header ────────────────────────────────── */
+      header {
+        position: relative;
+        z-index: 1;
+        text-align: center;
+        padding: 1rem 1rem 0.8rem;
+      }
+
+      header h1 {
+        display: inline-block;
+        font-size: clamp(1.9rem, 3.2vw, 2.9rem);
+        line-height: 1.3;
+        padding-bottom: 0.12em;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        background: linear-gradient(135deg, var(--accent), var(--accent3));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      header p {
+        font-family: 'Space Mono', monospace;
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-top: 0.3rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      /* ── Controls ──────────────────────────────── */
+      .controls {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.7rem;
+        align-items: center;
+        justify-content: center;
+        padding: 0.9rem 1.1rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        width: 100%;
+      }
+
+      /* Dans la colonne de gauche, chaque groupe de réglages occupe sa ligne */
+      .controls .ctrl-group {
+        width: 100%;
+      }
+
+      .controls .ctrl-group + .ctrl-group {
+        border-top: 1px solid var(--border);
+        padding-top: 0.55rem;
+      }
+
+      /* ── Disposition : réglages à gauche, simulation à droite ── */
+      .layout {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: minmax(300px, 27rem) minmax(0, 1fr);
+        gap: 1.6rem;
+        width: 100%;
+        max-width: 1500px;
+        padding: 0 1rem 0.6rem;
+        align-items: start;
+      }
+
+      .side {
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+
+      .main {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 0;
+        position: sticky;
+        top: 0.8rem;
+      }
+
+      @media (max-width: 900px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+        .main {
+          position: static;
+        }
+      }
+      .ctrl-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        align-items: center;
+      }
+
+      .ctrl-group label {
+        font-family: 'Space Mono', monospace;
+        font-size: 0.75rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+
+      .iter-display {
+        font-family: 'Space Mono', monospace;
+        font-size: 1.9rem;
+        font-weight: 700;
+        color: var(--accent);
+        min-width: 80px;
+        text-align: center;
+      }
+
+      .iter-buttons {
+        display: flex;
+        gap: 0.4rem;
+      }
+
+      /* ── Buttons ───────────────────────────────── */
+      .btn-sm {
+        background: var(--border);
+        border: 1px solid var(--muted);
+        color: var(--text);
+        font-family: 'Space Mono', monospace;
+        font-size: 1.1rem;
+        width: 2.3rem;
+        height: 2.3rem;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.15s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      .btn-sm:hover {
+        background: var(--accent);
+        color: var(--bg);
+        border-color: var(--accent);
+      }
+
+      input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 180px;
+        height: 4px;
+        background: var(--border);
+        border-radius: 2px;
+        outline: none;
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+        box-shadow: 0 0 8px var(--accent);
+      }
+
+      input[type="range"]::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        border: none;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+        box-shadow: 0 0 8px var(--accent);
+      }
+
+      .preset-btns {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.4rem;
+      }
+
+      .preset {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        font-family: 'Space Mono', monospace;
+        font-size: 0.78rem;
+        padding: 0.38rem 0.7rem;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.15s;
+        letter-spacing: 0.05em;
+      }
+
+      .preset:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .preset.active {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: rgba(0, 255, 204, 0.08);
+      }
+
+      .btn-run {
+        background: var(--accent);
+        color: var(--bg);
+        border: none;
+        font-family: 'Syne', sans-serif;
+        font-weight: 700;
+        font-size: 1rem;
+        padding: 0.7rem 1.8rem;
+        border-radius: 10px;
+        cursor: pointer;
+        letter-spacing: 0.05em;
+        transition: all 0.2s;
+        box-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
+      }
+
+      .btn-run:hover {
+        transform: scale(1.04);
+        box-shadow: 0 0 30px rgba(0, 255, 204, 0.5);
+      }
+
+      .btn-run:active {
+        transform: scale(0.98);
+      }
+
+      .btn-run.running {
+        background: var(--accent2);
+        box-shadow: 0 0 20px rgba(255, 107, 107, 0.3);
+      }
+
+      .btn-clear {
+        background: transparent;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        font-family: 'Syne', sans-serif;
+        font-weight: 700;
+        font-size: 1rem;
+        padding: 0.7rem 1.3rem;
+        border-radius: 10px;
+        cursor: pointer;
+        letter-spacing: 0.05em;
+        transition: all 0.2s;
+      }
+
+      .btn-clear:hover {
+        border-color: var(--accent2);
+        color: var(--accent2);
+      }
+
+      /* ── Zoom : sélecteur de mode ──────────────── */
+      .seg {
+        display: flex;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .seg-btn {
+        background: transparent;
+        border: none;
+        color: var(--muted);
+        font-family: 'Space Mono', monospace;
+        font-size: 0.78rem;
+        padding: 0.5rem 0.9rem;
+        cursor: pointer;
+        letter-spacing: 0.05em;
+        transition: all 0.15s;
+      }
+
+      .seg-btn + .seg-btn {
+        border-left: 1px solid var(--border);
+      }
+
+      .seg-btn:hover {
+        color: var(--accent);
+      }
+
+      .seg-btn.active {
+        color: var(--accent);
+        background: rgba(0, 255, 204, 0.08);
+      }
+
+      .zoom-row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+      }
+
+      .zoom-value {
+        font-family: 'Space Mono', monospace;
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--accent3);
+        min-width: 7.5ch;
+        text-align: left;
+      }
+
+      .zoom-info {
+        flex-basis: 100%;
+        font-family: 'Space Mono', monospace;
+        font-size: 0.8rem;
+        color: var(--muted);
+        text-align: center;
+        line-height: 1.65;
+      }
+
+      .zoom-info b {
+        color: var(--accent);
+        font-weight: 700;
+      }
+
+      .is-hidden {
+        display: none !important;
+      }
+
+      /* ── Canvas ────────────────────────────────── */
+      .canvas-wrap {
+        position: relative;
+        z-index: 1;
+        width: min(100%, 60rem, max(300px, calc(100vh - 18.4rem)));
+        aspect-ratio: 1;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        overflow: hidden;
+        background: #08080d;
+        box-shadow:
+          0 0 60px rgba(0, 255, 204, 0.05),
+          inset 0 0 40px rgba(0, 0, 0, 0.4);
+      }
+
+      canvas#canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+        cursor: grab;
+        touch-action: none;
+      }
+
+      canvas#canvas.dragging {
+        cursor: grabbing;
+      }
+
+      /* Mini-carte : où suis-je dans la figure ? */
+      #minimap {
+        position: absolute;
+        left: 10px;
+        bottom: 10px;
+        width: 120px;
+        height: 110px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: rgba(10, 10, 15, 0.85);
+        display: none;
+        pointer-events: none;
+      }
+
+      .canvas-wrap.zoomed #minimap {
+        display: block;
+      }
+
+      /* ── Stats ─────────────────────────────────── */
+      .stats {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.4rem 1.5rem;
+        padding: 0.3rem 1rem;
+        font-family: 'Space Mono', monospace;
+        font-size: 0.85rem;
+        color: var(--muted);
+        margin-top: 0.5rem;
+      }
+
+      .stats em { font-style: normal; }
+
+      .stats span {
+        color: var(--accent3);
+        font-weight: 700;
+      }
+
+      /* ── Step info ─────────────────────────────── */
+      .step-info {
+        position: relative;
+        z-index: 1;
+        font-family: 'Space Mono', monospace;
+        font-size: 0.8rem;
+        color: var(--muted);
+        text-align: center;
+        padding: 0 1rem 0.3rem;
+        max-width: 46rem;
+        line-height: 1.55;
+      }
+
+      .step-info.last {
+        padding-bottom: 0;
+      }
+
+      /* Espace réservé : la note de zoom n'allonge plus la page quand elle apparaît */
+      #zoomNote {
+        min-height: 3.9rem;
+      }
+
+      .dot-vertex { color: var(--accent3); }
+      .dot-point  { color: var(--accent2); }
+      .dot-mid    { color: var(--accent);  }
+    </style>
+  </head>
+
+  <body>
+
+    <header>
+      <h1>Triangle de Sierpiński</h1>
+      <p>Jeu du chaos — Fractale par itérations aléatoires, avec zoom</p>
+    </header>
+
+    <div class="layout">
+
+    <!-- ── Colonne de gauche : réglages ─────────────── -->
+    <aside class="side">
+
+    <!-- ── Controls : jeu du chaos ──────────────────── -->
+    <div class="controls" id="chaosControls">
+
+      <!-- Nombre d'itérations -->
+      <div class="ctrl-group">
+        <label>Itérations</label>
+        <div class="iter-display" id="iterDisplay">1K</div>
+        <input type="range" id="iterSlider" min="1" max="10" value="3" step="1">
+        <div class="preset-btns">
+          <button class="preset" data-val="1">100</button>
+          <button class="preset" data-val="2">500</button>
+          <button class="preset" data-val="3">1K</button>
+          <button class="preset" data-val="4">5K</button>
+          <button class="preset" data-val="5">10K</button>
+          <button class="preset" data-val="6">50K</button>
+          <button class="preset" data-val="7">100K</button>
+          <button class="preset" data-val="8">1M</button>
+          <button class="preset" data-val="9">10M</button>
+          <button class="preset" data-val="10">100M</button>
+        </div>
+      </div>
+
+      <!-- Vitesse + boutons -->
+      <div class="ctrl-group">
+        <label>Vitesse</label>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <input type="range" id="speedSlider" min="1" max="8" value="3" step="1" style="width:120px;">
+          <span id="speedLabel" style="font-family:'Space Mono',monospace; font-size:0.9rem; color:var(--accent3);">×1</span>
+        </div>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="btn-run" id="btnRun">▶ LANCER</button>
+          <button class="btn-clear" id="btnClear">✕ EFFACER</button>
+        </div>
+      </div>
+
+    </div><!-- /#chaosControls -->
+
+    <!-- ── Controls : zoom ──────────────────────────── -->
+    <div class="controls" id="zoomControls">
+
+      <div class="ctrl-group">
+        <label>Affichage</label>
+        <div class="seg">
+          <button class="seg-btn active" data-mode="chaos">Jeu du chaos</button>
+          <button class="seg-btn" data-mode="exact">Construction exacte</button>
+        </div>
+        <button class="preset" id="btnShortcut" title="Force les derniers sommets choisis pour tomber dans la fenêtre : même loi que le vrai jeu du chaos, obtenue beaucoup plus vite">Orbite dirigée : NON</button>
+      </div>
+
+      <div class="ctrl-group">
+        <label>Zoom</label>
+        <div class="zoom-row">
+          <button class="btn-sm" id="zoomOut" aria-label="Dézoomer">−</button>
+          <input type="range" id="zoomSlider" min="0" max="30" step="0.05" value="0" style="width:150px;">
+          <button class="btn-sm" id="zoomIn" aria-label="Zoomer">+</button>
+          <span class="zoom-value" id="zoomValue">×1</span>
+        </div>
+        <div class="preset-btns">
+          <button class="preset" data-level="0">×1</button>
+          <button class="preset" data-level="2">×4</button>
+          <button class="preset" data-level="6">×64</button>
+          <button class="preset" data-level="10">×1 024</button>
+          <button class="preset" data-level="20">×1 million</button>
+        </div>
+      </div>
+
+      <div class="ctrl-group">
+        <label>Plonger dans un sous-triangle</label>
+        <div class="preset-btns">
+          <button class="preset" id="goTop">▲ Haut</button>
+          <button class="preset" id="goLeft">◣ Gauche</button>
+          <button class="preset" id="goRight">◢ Droite</button>
+          <button class="preset" id="goParent">↶ Remonter</button>
+          <button class="preset" id="resetView">⌂ Vue d'ensemble</button>
+        </div>
+      </div>
+
+      <p class="zoom-info" id="zoomInfo"></p>
+
+    </div><!-- /#zoomControls -->
+
+    </aside>
+
+    <!-- ── Colonne de droite : simulation ───────────── -->
+    <main class="main">
+
+    <!-- ── Canvas ────────────────────────────────────── -->
+    <div class="canvas-wrap" id="canvasWrap">
+      <canvas id="canvas" width="618" height="618"></canvas>
+      <canvas id="minimap" width="120" height="110"></canvas>
+    </div>
+
+    <!-- ── Stats ─────────────────────────────────────── -->
+    <div class="stats">
+      <div><em id="lblPoints">Points dans la fenêtre</em> : <span id="statPoints">0</span></div>
+      <div id="boxPct">Progression : <span id="statPct">0%</span></div>
+      <div>Statut : <span id="statStatus">En attente</span></div>
+    </div>
+
+    <!-- ── Légende ────────────────────────────────────── -->
+    <div class="step-info">
+      <span class="dot-vertex">▲ Sommets du triangle</span>
+      &nbsp;|&nbsp;
+      <span class="dot-point">● Point courant</span>
+      &nbsp;|&nbsp;
+      <span class="dot-mid">· Points générés</span>
+      <br>
+      Algorithme : choisir un sommet au hasard → placer le milieu → répéter
+    </div>
+
+    <div class="step-info" id="zoomNote"></div>
+
+    <div class="step-info last">
+      Molette : zoom &nbsp;|&nbsp; Glisser : se déplacer &nbsp;|&nbsp; Double-clic : zoom ×2
+    </div>
+
+    </main>
+
+    </div><!-- /.layout -->
+
+    <!-- ── Script ─────────────────────────────────────── -->
+    <script>
+      const canvas = document.getElementById('canvas');
+      const ctx    = canvas.getContext('2d');
+      const mini   = document.getElementById('minimap');
+      const mctx   = mini.getContext('2d');
+      const wrap   = document.getElementById('canvasWrap');
+
+      // ── Géométrie ────────────────────────────────────
+      // Triangle de référence, côté 1 : haut, bas-gauche, bas-droit.
+      // Chaque sous-triangle est une copie de celui-ci : une origine (ox, oy) et un côté s.
+      const H3  = Math.sqrt(3) / 2;
+      const REF = [ { x: 0.5, y: 0 }, { x: 0, y: H3 }, { x: 1, y: H3 } ];
+
+      const MAX_LEVEL = 30;            // zoom maximal : ×2^30 ≈ ×1 milliard
+      const MAX_ZOOM  = 2 ** MAX_LEVEL;
+      const COLORS    = [
+        'rgba(0,   255, 204, 0.85)',   // sommet du haut
+        'rgba(255, 107, 107, 0.85)',   // sommet bas-gauche
+        'rgba(255, 209, 102, 0.85)',   // sommet bas-droit
+      ];
+
+      // ── Constantes ──────────────────────────────────
+      const PRESETS = [100, 500, 1_000, 5_000, 10_000, 50_000, 100_000, 1_000_000, 10_000_000, 100_000_000];
+      const SPEEDS  = [1, 5, 20, 100, 500, 5_000, 50_000, 500_000]; // points par frame
+      const SPEED_NAMES = ['×0,05', '×0,25', '×1', '×5', '×25', '×250', '×2 500', '×25 000']; // relatifs à 20 points/frame
+
+      // ── État ────────────────────────────────────────
+      let W = 618, H = 618, dpr = 1;
+      let totalIter   = 1_000;
+      let ptsPerFrame = SPEEDS[2];
+      let animId      = null;
+      let running     = false;
+      let drawnCount  = 0;       // points générés et traités
+      let visibleCount = 0;      // points réellement visibles dans la fenêtre
+      let hasContent  = false;   // des points ont-ils été lancés ? (EFFACER remet à false)
+      let mode        = 'chaos'; // 'chaos' ou 'exact'
+
+      // Vue : niveau de zoom et centre (en unités du triangle de référence)
+      const view = { zoom: 1, cx: 0.5, cy: H3 / 2 };
+
+      // Calque de points : on écrit directement dans un tampon de pixels (bien plus rapide
+      // que des milliards de fillRect), puis on le superpose au fond.
+      const layer = document.createElement('canvas');
+      const lctx  = layer.getContext('2d');
+      let img = null, pix = null, PTSZ = 2;
+      const RGB = [[0, 255, 204], [255, 107, 107], [255, 209, 102]].map(c => c.map(v => Math.round(v * 0.9)));
+      const DIRECTED_CAP = 10_000_000;   // au-delà, la fenêtre est saturée en orbite dirigée
+      let planned = 0;                    // nombre de points prévus pour le tracé en cours
+
+      // Orbite du jeu du chaos : générée en flux (aucun stockage)
+      let orbit    = null;
+      let seed     = 20240601;
+      let directed = false;     // orbite dirigée (désactivée par défaut)
+
+      // ── Dimensions ──────────────────────────────────
+      function resize() {
+        const w = canvas.parentElement.clientWidth || 618;
+        dpr = window.devicePixelRatio || 1;
+        W = w;
+        H = w;
+        canvas.width  = Math.round(w * dpr);
+        canvas.height = Math.round(w * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        layer.width  = canvas.width;
+        layer.height = canvas.height;
+        img  = lctx.createImageData(layer.width, layer.height);
+        pix  = img.data;
+        PTSZ = Math.max(2, Math.round(1.8 * dpr));
+
+        mini.width  = Math.round(120 * dpr);
+        mini.height = Math.round(110 * dpr);
+        mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      function getScale() { return W * 0.8 * view.zoom; }   // pixels par unité
+
+      function levelOf(zoom) { return Math.max(0, Math.floor(Math.log2(zoom) + 1e-9)); }
+
+      function clamp(v, a, b) { return Math.min(b, Math.max(a, v)); }
+
+      function clampView() {
+        view.zoom = clamp(view.zoom, 1, MAX_ZOOM);
+        if (view.zoom < 1.0001) {
+          view.zoom = 1;
+          view.cx = 0.5;
+          view.cy = H3 / 2;
+        } else {
+          view.cx = clamp(view.cx, 0, 1);
+          view.cy = clamp(view.cy, 0, H3);
+        }
+      }
+
+      // ── Fenêtre visible : sous-triangles à afficher ──
+      // Au niveau k = ⌊log2(zoom)⌋, un sous-triangle a à peu près la taille de la fenêtre.
+      // On ne garde que ceux qui touchent la zone visible.
+      function getFrame() {
+        const scale = getScale();
+        const k     = levelOf(view.zoom);
+        const half  = (W / 2) / scale;
+        const vx0 = view.cx - half, vx1 = view.cx + half;
+        const vy0 = view.cy - half, vy1 = view.cy + half;
+
+        const nodes = [];
+        (function rec(ox, oy, s, d, path) {
+          if (ox > vx1 || ox + s < vx0 || oy > vy1 || oy + H3 * s < vy0) return;
+          if (d === k) {
+            nodes.push({
+              sx: (ox - view.cx) * scale + W / 2,   // origine à l'écran
+              sy: (oy - view.cy) * scale + H / 2,
+              ss: s * scale,                        // côté à l'écran
+              path,                                 // adresse : sommets choisis, du plus récent au plus ancien
+            });
+            return;
+          }
+          const s2 = s / 2;
+          for (let i = 0; i < 3; i++) rec(ox + REF[i].x * s2, oy + REF[i].y * s2, s2, d + 1, path.concat(i));
+        })(0, 0, 1, 0, []);
+
+        return { scale, k, nodes };
+      }
+
+      // ── Fond : contours + sommets ────────────────────
+      function drawBase(frame) {
+        ctx.clearRect(0, 0, W, H);
+
+        frame.nodes.forEach(n => {
+          const pts = REF.map(r => ({ x: n.sx + n.ss * r.x, y: n.sy + n.ss * r.y }));
+
+          // Contour du triangle
+          ctx.beginPath();
+          ctx.moveTo(pts[0].x, pts[0].y);
+          ctx.lineTo(pts[1].x, pts[1].y);
+          ctx.lineTo(pts[2].x, pts[2].y);
+          ctx.closePath();
+          ctx.strokeStyle = 'rgba(255, 209, 102, 0.18)';
+          ctx.lineWidth   = 1.5;
+          ctx.stroke();
+
+          // Points des sommets
+          pts.forEach(v => {
+            if (v.x < -20 || v.x > W + 20 || v.y < -20 || v.y > H + 20) return;
+            ctx.beginPath();
+            ctx.arc(v.x, v.y, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffd166';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(v.x, v.y, 8, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(255, 209, 102, 0.4)';
+            ctx.lineWidth   = 1;
+            ctx.stroke();
+          });
+        });
+      }
+
+      // ── Jeu du chaos : orbite réelle ─────────────────
+      function makeRng(s) {
+        let a = s >>> 0;
+        return function () {
+          a = (a + 0x6D2B79F5) >>> 0;
+          let t = a;
+          t = Math.imul(t ^ (t >>> 15), t | 1);
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      const RX = [0.5, 0, 1];
+      const RY = [0, H3, H3];
+
+      function newOrbit(sd) {
+        const rng = makeRng(sd);
+        const o = { x: 0.5, y: 2 * H3 / 3, n: 0, hist: new Uint8Array(64), rng };
+        for (let i = 0; i < 40; i++) {              // échauffement
+          const c = Math.floor(rng() * 3);
+          o.x = (o.x + RX[c]) / 2;
+          o.y = (o.y + RY[c]) / 2;
+          o.hist[o.n & 63] = c;
+          o.n++;
+        }
+        return o;
+      }
+
+      // Fait avancer l'orbite de `count` pas et trace les points qui tombent dans la fenêtre.
+      //
+      // Mode réel : on trace le vrai point (x, y) s'il est dans la fenêtre.
+      //
+      // Mode « orbite dirigée » : pour tomber dans un sous-triangle de niveau k, les k derniers
+      // sommets choisis doivent être exactement ceux de son adresse (1 chance sur 3^k).
+      // On FORCE ces k derniers choix, après un tirage aléatoire de l'orbite. Chaque point obtenu
+      // est donc un vrai point du jeu du chaos, mais conditionné à tomber dans la fenêtre :
+      // même loi de probabilité, obtenu 3^k fois plus vite.
+      //
+      // Dans les deux modes, la couleur est le (k+1)-ième dernier sommet choisi :
+      // le sous-triangle de niveau k+1 où se trouve le point.
+      function runOrbit(o, frame, count) {
+        const { nodes, scale, k } = frame;
+        const nn   = nodes.length;
+        const half = (W / 2) / scale;
+        const cx = view.cx, cy = view.cy;
+        const hist = o.hist, rng = o.rng;
+        const PW = layer.width, PH = layer.height;
+        const sz = PTSZ, off = sz / 2, d = dpr;
+        let x = o.x, y = o.y, n = o.n, shown = 0;
+
+        for (let i = 0; i < count; i++) {
+          const c = (rng() * 3) | 0;
+          x = (x + RX[c]) * 0.5;
+          y = (y + RY[c]) * 0.5;
+          hist[n & 63] = c;
+          n++;
+
+          let ux = x, uy = y, col = hist[(n - 1 - k) & 63];
+          if (directed) {
+            if (!nn) continue;
+            const p = nodes[(rng() * nn) | 0].path;
+            for (let j = p.length - 1; j >= 0; j--) {   // k derniers pas imposés
+              ux = (ux + RX[p[j]]) * 0.5;
+              uy = (uy + RY[p[j]]) * 0.5;
+            }
+            col = c;
+          }
+
+          const dx = ux - cx, dy = uy - cy;
+          if (dx < -half || dx > half || dy < -half || dy > half) continue;
+          const fx = (dx * scale + W / 2) * d - off;
+          const fy = (dy * scale + H / 2) * d - off;
+          if (fx < 0 || fy < 0 || fx + sz > PW || fy + sz > PH) continue;
+
+          const ix = fx | 0, iy = fy | 0;
+          const rgb = RGB[col], r = rgb[0], g = rgb[1], b = rgb[2];
+          for (let yy = 0; yy < sz; yy++) {
+            let idx = ((iy + yy) * PW + ix) * 4;
+            for (let xx = 0; xx < sz; xx++) {
+              pix[idx] = r; pix[idx + 1] = g; pix[idx + 2] = b; pix[idx + 3] = 255;
+              idx += 4;
+            }
+          }
+          shown++;
+        }
+        o.x = x; o.y = y; o.n = n;
+        return shown;
+      }
+
+      // Affiche : fond (contours, sommets) puis calque de points
+      function present(frame) {
+        drawBase(frame);
+        lctx.putImageData(img, 0, 0);
+        ctx.drawImage(layer, 0, 0, W, H);
+      }
+
+      // ── Construction exacte : récursion limitée à la fenêtre ──
+      function renderExact() {
+        ctx.clearRect(0, 0, W, H);
+        const scale = getScale();
+        const k     = levelOf(view.zoom);
+        const buckets = [[], [], []];
+        const MIN_SIDE = 1.5;           // en dessous, on trace un petit triangle plein
+        const MAX_DEPTH = MAX_LEVEL + 14;
+
+        (function rec(X, Y, S, d, col) {
+          if (X > W + 1 || X + S < -1 || Y > H + 1 || Y + H3 * S < -1) return;
+          if (S < MIN_SIDE || d >= MAX_DEPTH) { buckets[col].push(X, Y, S); return; }
+          const S2 = S / 2;
+          for (let i = 0; i < 3; i++) {
+            rec(X + REF[i].x * S2, Y + REF[i].y * S2, S2, d + 1, d === k ? i : col);
+          }
+        })((0 - view.cx) * scale + W / 2, (0 - view.cy) * scale + H / 2, scale, 0, 0);
+
+        let total = 0;
+        for (let c = 0; c < 3; c++) {
+          const b = buckets[c];
+          if (!b.length) continue;
+          ctx.fillStyle = COLORS[c];
+          ctx.beginPath();
+          for (let j = 0; j < b.length; j += 3) {
+            const X = b[j], Y = b[j + 1], S = b[j + 2];
+            ctx.moveTo(X + S / 2, Y);
+            ctx.lineTo(X, Y + H3 * S);
+            ctx.lineTo(X + S, Y + H3 * S);
+            ctx.closePath();
+          }
+          ctx.fill();
+          total += b.length / 3;
+        }
+        return total;
+      }
+
+      // ── Mini-carte : où suis-je ? ────────────────────
+      function drawMini() {
+        const w = 120, h = 110, ms = 100, ox = 10, oy = 8;
+        mctx.clearRect(0, 0, w, h);
+
+        mctx.fillStyle = 'rgba(0, 255, 204, 0.45)';
+        mctx.beginPath();
+        (function rec(x, y, s, d) {
+          if (d === 5) {
+            mctx.moveTo(ox + (x + s / 2) * ms, oy + y * ms);
+            mctx.lineTo(ox + x * ms,           oy + (y + H3 * s) * ms);
+            mctx.lineTo(ox + (x + s) * ms,     oy + (y + H3 * s) * ms);
+            mctx.closePath();
+            return;
+          }
+          const s2 = s / 2;
+          for (let i = 0; i < 3; i++) rec(x + REF[i].x * s2, y + REF[i].y * s2, s2, d + 1);
+        })(0, 0, 1, 0);
+        mctx.fill();
+
+        // Rectangle de la fenêtre visible
+        const half = (W / 2) / getScale();
+        let rx = ox + (view.cx - half) * ms;
+        let ry = oy + (view.cy - half) * ms;
+        let rw = 2 * half * ms;
+        if (rw < 4) { rx -= (4 - rw) / 2; ry -= (4 - rw) / 2; rw = 4; }
+        mctx.save();
+        mctx.beginPath();
+        mctx.rect(0, 0, w, h);
+        mctx.clip();
+        mctx.strokeStyle = '#ff6b6b';
+        mctx.lineWidth = 1.5;
+        mctx.strokeRect(rx, ry, rw, rw);
+        mctx.restore();
+      }
+
+      // ── Affichages (zoom, statistiques) ──────────────
+      const el = id => document.getElementById(id);
+
+      function fmt(n) {
+        return n < 10
+          ? n.toLocaleString('fr', { maximumFractionDigits: 1 })
+          : Math.round(n).toLocaleString('fr');
+      }
+
+      function setStats(points, pct, status) {
+        el('statPoints').textContent = points;
+        el('statPct').textContent    = pct + '%';
+        el('statStatus').textContent = status;
+      }
+
+      function pointsText() {
+        return visibleCount.toLocaleString('fr') + ' sur ' + drawnCount.toLocaleString('fr');
+      }
+
+      function updateReadouts() {
+        const z = view.zoom;
+        const k = levelOf(z);
+        el('zoomValue').textContent = '×' + fmt(z);
+        el('zoomSlider').value = Math.log2(z);
+        wrap.classList.toggle('zoomed', z > 1.2);
+
+        el('zoomInfo').innerHTML = z < 1.9
+          ? 'Vue d\'ensemble. Zoomez (molette, boutons ou double-clic), puis glissez pour vous déplacer.'
+          : 'Niveau <b>' + k + '</b> : la figure est faite de <b>' + (3 ** k).toLocaleString('fr') +
+            '</b> copies d\'elle-même, chacune <b>' + (2 ** k).toLocaleString('fr') +
+            '</b> fois plus petite. Chacune ressemble exactement au tout.';
+
+        let note = '';
+        if (mode === 'chaos' && z >= 1.9) {
+          const odds = (3 ** k).toLocaleString('fr');
+          note = directed
+            ? 'Orbite dirigée : on impose les ' + k + ' derniers sommets choisis (1 chance sur ' + odds +
+              ' d\'y arriver seul) et on tire le reste au hasard. Même loi que le vrai jeu du chaos, ' + odds + ' fois plus vite.' +
+              (totalIter > DIRECTED_CAP ? ' Plafonné à 10 M de points (fenêtre saturée).' : '')
+            : 'Points réels : environ 1 sur ' + odds + ' tombe dans la fenêtre. Pour en avoir 1 000, il faudrait de l\'ordre de ' +
+              (1000 * 3 ** k).toLocaleString('fr') + ' itérations. Essayez « Orbite dirigée » ou « Construction exacte ».';
+        }
+        el('zoomNote').textContent = note;
+      }
+
+      function finishStatus() {
+        if (!hasContent) return 'En attente';
+        if (drawnCount < planned) return 'Zoom…';
+        return visibleCount === 0 ? 'Aucun point ici' : 'Terminé ✓';
+      }
+
+      function cancelAnim() {
+        running = false;
+        if (animId) { cancelAnimationFrame(animId); animId = null; }
+        el('btnRun').textContent = '▶ LANCER';
+        el('btnRun').classList.remove('running');
+      }
+
+      // Trace `instant` points tout de suite, puis (si animate) le reste en animation.
+      function beginPaint(instant, animate) {
+        cancelAnim();
+        const frame = getFrame();
+        pix.fill(0);
+        updateReadouts();
+
+        planned      = directed ? Math.min(totalIter, DIRECTED_CAP) : totalIter;
+        orbit        = newOrbit(seed);
+        drawnCount   = 0;
+        visibleCount = 0;
+
+        const n0 = Math.min(planned, instant);
+        if (n0 > 0) {
+          visibleCount = runOrbit(orbit, frame, n0);
+          drawnCount   = n0;
+        }
+        present(frame);
+        setStats(pointsText(), Math.round(100 * drawnCount / planned), finishStatus());
+
+        if (animate && drawnCount < planned) {
+          running = true;
+          el('btnRun').textContent = '■ STOP';
+          el('btnRun').classList.add('running');
+          el('statStatus').textContent = 'Animation…';
+
+          function step() {
+            if (!running) return;
+            const end = Math.min(drawnCount + ptsPerFrame, planned);
+            visibleCount += runOrbit(orbit, frame, end - drawnCount);
+            drawnCount = end;
+            present(frame);
+            el('statPoints').textContent = pointsText();
+            el('statPct').textContent    = Math.round((drawnCount / planned) * 100) + '%';
+            if (drawnCount < planned) animId = requestAnimationFrame(step);
+            else stopAnimation(true);
+          }
+          animId = requestAnimationFrame(step);
+        }
+      }
+
+      // ── Rendu selon le mode ──────────────────────────
+      function renderCurrent(opts = {}) {
+        const { instant = 200_000, animate = true } = opts;
+        if (mode === 'exact') {
+          cancelAnim();
+          updateReadouts();
+          const n = renderExact();
+          setStats(n.toLocaleString('fr'), 0, 'Construction exacte');
+        } else if (hasContent) {
+          beginPaint(instant, animate);
+        } else {
+          cancelAnim();
+          updateReadouts();
+          drawBase(getFrame());
+          setStats('0', 0, 'En attente');
+        }
+        drawMini();
+      }
+
+      // Rendu demandé par une interaction (limité pendant le glissement, complet ensuite)
+      let renderPending = false;
+      let settleTimer   = null;
+
+      function scheduleRender(interactive) {
+        if (running) cancelAnim();
+        if (!renderPending) {
+          renderPending = true;
+          requestAnimationFrame(() => {
+            renderPending = false;
+            renderCurrent(interactive ? { instant: 20_000, animate: false } : {});
+          });
+        }
+        clearTimeout(settleTimer);
+        if (interactive) settleTimer = setTimeout(() => renderCurrent(), 160);
+      }
+
+      // ── Animation principale (jeu du chaos) ──────────
+      function startAnimation() {
+        if (running) {
+          stopAnimation();
+          return;
+        }
+        resize();
+        seed = (Math.random() * 4294967296) >>> 0;
+        hasContent = true;
+        beginPaint(0, true);
+      }
+
+      function stopAnimation(finished = false) {
+        cancelAnim();
+        el('statStatus').textContent = finished ? finishStatus() : 'Arrêté';
+        // Le canvas n'est volontairement pas effacé : le résultat reste visible.
+      }
+
+      function clearCanvas() {
+        if (running) return; // pas d'effacement pendant l'animation
+
+        hasContent   = false;
+        drawnCount   = 0;
+        visibleCount = 0;
+        pix.fill(0);
+        drawBase(getFrame());
+        setStats('0', 0, 'En attente');
+      }
+
+      // ── Réglages : itérations ───────────────────────
+      const slider  = el('iterSlider');
+      const display = el('iterDisplay');
+      const presets = document.querySelectorAll('#chaosControls .preset');
+
+      function setIter(val) {
+        totalIter = PRESETS[val - 1];
+        display.textContent = totalIter >= 1_000_000
+          ? (totalIter / 1_000_000) + 'M'
+          : totalIter >= 1_000
+            ? (totalIter / 1_000) + 'K'
+            : totalIter.toString();
+
+        presets.forEach(b =>
+          b.classList.toggle('active', parseInt(b.dataset.val) === parseInt(val))
+        );
+        slider.value = val;
+      }
+
+      slider.addEventListener('input', () => setIter(slider.value));
+      presets.forEach(b => b.addEventListener('click', () => setIter(b.dataset.val)));
+      setIter(3); // valeur initiale
+
+      // ── Réglages : vitesse ──────────────────────────
+      const speedSlider = el('speedSlider');
+      const speedLabel  = el('speedLabel');
+
+      speedSlider.addEventListener('input', () => {
+        ptsPerFrame = SPEEDS[speedSlider.value - 1];
+        speedLabel.textContent = SPEED_NAMES[speedSlider.value - 1];
+      });
+
+      el('btnShortcut').addEventListener('click', () => {
+        directed = !directed;
+        el('btnShortcut').textContent = 'Orbite dirigée : ' + (directed ? 'OUI' : 'NON');
+        el('btnShortcut').classList.toggle('active', directed);
+        renderCurrent();
+      });
+
+      el('btnRun').addEventListener('click', startAnimation);
+      el('btnClear').addEventListener('click', clearCanvas);
+
+      // ══ ZOOM ═══════════════════════════════════════
+      // Zoom centré sur un point de l'écran (mx, my) : ce point reste fixe.
+      function zoomAt(mx, my, factor) {
+        const oldScale = getScale();
+        const wx = view.cx + (mx - W / 2) / oldScale;
+        const wy = view.cy + (my - H / 2) / oldScale;
+        view.zoom = clamp(view.zoom * factor, 1, MAX_ZOOM);
+        const newScale = getScale();
+        view.cx = wx - (mx - W / 2) / newScale;
+        view.cy = wy - (my - H / 2) / newScale;
+        clampView();
+        scheduleRender(true);
+      }
+
+      function setZoomLevel(level) {
+        view.zoom = 2 ** clamp(level, 0, MAX_LEVEL);
+        clampView();
+        scheduleRender(false);
+      }
+
+      // Sous-triangle de niveau k dont le centre est le plus proche du centre de la vue
+      function nearestNode(k) {
+        let ox = 0, oy = 0, s = 1;
+        for (let d = 0; d < k; d++) {
+          const s2 = s / 2;
+          let best = 0, bd = Infinity;
+          for (let i = 0; i < 3; i++) {
+            const cx = ox + REF[i].x * s2 + s2 / 2;
+            const cy = oy + REF[i].y * s2 + H3 * s2 / 2;
+            const dist = (cx - view.cx) ** 2 + (cy - view.cy) ** 2;
+            if (dist < bd) { bd = dist; best = i; }
+          }
+          ox += REF[best].x * s2;
+          oy += REF[best].y * s2;
+          s = s2;
+        }
+        return { ox, oy, s };
+      }
+
+      function frameOn(node, level) {
+        view.zoom = 2 ** level;
+        view.cx = node.ox + node.s / 2;
+        view.cy = node.oy + H3 * node.s / 2;
+        clampView();
+        scheduleRender(false);
+      }
+
+      function goChild(i) {
+        const k = clamp(Math.round(Math.log2(view.zoom)), 0, MAX_LEVEL);
+        if (k >= MAX_LEVEL) return;
+        const n = nearestNode(k);
+        const s2 = n.s / 2;
+        frameOn({ ox: n.ox + REF[i].x * s2, oy: n.oy + REF[i].y * s2, s: s2 }, k + 1);
+      }
+
+      function goParent() {
+        const k = clamp(Math.round(Math.log2(view.zoom)), 0, MAX_LEVEL);
+        if (k <= 1) { resetView(); return; }
+        frameOn(nearestNode(k - 1), k - 1);
+      }
+
+      function resetView() {
+        view.zoom = 1;
+        view.cx = 0.5;
+        view.cy = H3 / 2;
+        scheduleRender(false);
+      }
+
+      el('zoomIn').addEventListener('click',  () => zoomAt(W / 2, H / 2, 2));
+      el('zoomOut').addEventListener('click', () => zoomAt(W / 2, H / 2, 0.5));
+      el('zoomSlider').addEventListener('input', e => setZoomLevel(parseFloat(e.target.value)));
+      document.querySelectorAll('#zoomControls .preset[data-level]').forEach(b =>
+        b.addEventListener('click', () => setZoomLevel(parseInt(b.dataset.level)))
+      );
+      el('goTop').addEventListener('click',    () => goChild(0));
+      el('goLeft').addEventListener('click',   () => goChild(1));
+      el('goRight').addEventListener('click',  () => goChild(2));
+      el('goParent').addEventListener('click', goParent);
+      el('resetView').addEventListener('click', resetView);
+
+      // ── Mode : jeu du chaos / construction exacte ────
+      document.querySelectorAll('.seg-btn').forEach(b =>
+        b.addEventListener('click', () => {
+          cancelAnim();
+          mode = b.dataset.mode;
+          document.querySelectorAll('.seg-btn').forEach(x => x.classList.toggle('active', x === b));
+          const exact = mode === 'exact';
+          el('chaosControls').classList.toggle('is-hidden', exact);
+          el('boxPct').classList.toggle('is-hidden', exact);
+          el('btnShortcut').classList.toggle('is-hidden', exact);
+          el('lblPoints').textContent = exact ? 'Petits triangles tracés' : 'Points dans la fenêtre';
+          renderCurrent();
+        })
+      );
+
+      // ── Souris, doigt et molette sur la figure ───────
+      function canvasPos(e) {
+        const r = canvas.getBoundingClientRect();
+        return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height, k: W / r.width };
+      }
+
+      let dragging = false, lastX = 0, lastY = 0;
+
+      canvas.addEventListener('pointerdown', e => {
+        dragging = true;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
+        canvas.classList.add('dragging');
+      });
+
+      canvas.addEventListener('pointermove', e => {
+        if (!dragging || view.zoom <= 1) return;
+        const k = canvasPos(e).k;
+        const scale = getScale();
+        view.cx -= (e.clientX - lastX) * k / scale;
+        view.cy -= (e.clientY - lastY) * k / scale;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        clampView();
+        scheduleRender(true);
+      });
+
+      function endDrag() {
+        dragging = false;
+        canvas.classList.remove('dragging');
+      }
+      canvas.addEventListener('pointerup', endDrag);
+      canvas.addEventListener('pointercancel', endDrag);
+
+      canvas.addEventListener('wheel', e => {
+        e.preventDefault();
+        const p  = canvasPos(e);
+        const dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
+        zoomAt(p.x, p.y, Math.exp(-dy * 0.0015));
+      }, { passive: false });
+
+      canvas.addEventListener('dblclick', e => {
+        const p = canvasPos(e);
+        zoomAt(p.x, p.y, 2);
+      });
+
+      // ── Init ────────────────────────────────────────
+      resize();
+      window.addEventListener('resize', () => {
+        cancelAnim();
+        resize();
+        renderCurrent();
+      });
+
+      renderCurrent();
+    </script>
+
+</body>
+</html>
